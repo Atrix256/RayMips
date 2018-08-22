@@ -364,28 +364,25 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
 
             Vector2 uv = percent * uvtransform;
 
-            // TODO: do a version that samples from mip0 always.
-            // TODO: i guess the options would be: no mips nearest, mip nearest, mip bilinear, mip trilinear?
-
-            // TODO: choose nearest mip level by calculating mip and rounding!
-            // TODO: wrap uv's? or no?
-
-            // TODO: is it correct to round mip like this?
-
-            // TODO: wrap around is doing something weird on the vertical axis with y scale of 1. look into it!
+            // TODO: after calculating mip, do you round it or floor it?
 
             nearestMip0[outputIndex] = SampleNearest(texture[0], uv);
             nearestMip[outputIndex] = SampleNearest(texture[int(mip)], uv);
             bilinear[outputIndex] = SampleBilinear(texture[int(mip)], uv);
 
+            // TODO: only do the second bilinear if mip+1 is in range, else copy bilinear. Or do we need a SampleTrilinear function?
+            RGBU8 bilinearNextMip = SampleBilinear(texture[std::min(int(mip+1), (int)texture.size()-1)], uv);
+            trilinear[outputIndex] = lerp(bilinear[outputIndex], bilinearNextMip, std::fmodf(mip, 1.0f));
+
             ++outputIndex;
         }
     }
 
-    // TODO: combine the 3 images. vertically? and save the result
+    // TODO: combine the images and save the result? or leave them separate?
     stbi_write_png("out/nearest0.png", width, height, 3, nearestMip0.data(), 0);
     stbi_write_png("out/nearest.png", width, height, 3, nearestMip.data(), 0);
     stbi_write_png("out/bilinear.png", width, height, 3, bilinear.data(), 0);
+    stbi_write_png("out/trilinear.png", width, height, 3, trilinear.data(), 0);
 }
 
 int main(int argc, char **argv)
@@ -405,12 +402,11 @@ int main(int argc, char **argv)
         Matrix22 mat =
         {
             {
-                {2.25f, 0.0f},
+                {3.0f, 0.0f},
                 {0.0f, 1.0f},
             }
         };
 
-        // TODO: nearest is mirroring with colors.png (?!) and bilinear is all sorts of wrong. check it out.
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height);
     }
 
