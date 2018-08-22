@@ -59,6 +59,28 @@ float Dot(const Vector2& a, const Vector2& b)
         a[1] * b[1];
 }
 
+inline float PixelToUV(int pixel, int width)
+{
+    // x' = (x+0.5)/w
+    return (float(pixel) + 0.5f) / float(width);
+}
+
+inline int UVToPixel(float uv, int width)
+{
+    // x = x'*w-0.5
+    // You would then round to the nearest int, which means you would add 0.5 and cast to int. So:
+    // x = int(x'*w)
+    return int(uv*float(width));
+}
+
+inline int UVToPixel(float uv, int width, float& fract)
+{
+    // same as above, but gives you the fractional pixel value which is useful for interpolation
+    float x = (uv + 1.0f) * float(width) - 0.5f;
+    fract = std::fmodf(x, 1.0f);
+    return int(x - fract + 0.5f);
+}
+
 enum class SampleType
 {
     Nearest,
@@ -140,28 +162,20 @@ inline T lerp(const T& a, const T& b, float t)
 
 RGBU8 SampleNearest (const Image& image, const Vector2& uv)
 {
-    float xfloat = uv[0] * float(image.width);
-    float yfloat = uv[1] * float(image.height);
-
-    int x = int(xfloat + 0.5f) % (image.width);
-    int y = int(yfloat + 0.5f) % (image.height);
+    int x = UVToPixel(uv[0], image.width) % image.width;
+    int y = UVToPixel(uv[1], image.height) % image.height;
 
     return image.pixels[y*image.width + x];
 }
 
 RGBU8 SampleBilinear(const Image& image, const Vector2& uv)
 {
-    float xfloat = uv[0] * float(image.width);
-    float yfloat = uv[1] * float(image.height);
+    float xweight, yweight;
 
-    float xweight = std::fmodf(xfloat, 1.0f);
-    float yweight = std::fmodf(yfloat, 1.0f);
-
-    int x0 = int(xfloat + 0.5f) % (image.width);
-    int y0 = int(yfloat + 0.5f) % (image.height);
-
-    int x1 = (x0 + 1) % (image.width);
-    int y1 = (y0 + 1) % (image.height);
+    int x0 = UVToPixel(uv[0], image.width, xweight) % image.width;
+    int y0 = UVToPixel(uv[1], image.height, yweight) % image.height;
+    int x1 = (x0 + 1) % image.width;
+    int y1 = (y0 + 1) % image.height;
 
     RGBU8 p00 = image.pixels[y0*image.width + x0];
     RGBU8 p10 = image.pixels[y0*image.width + x1];
@@ -302,44 +316,53 @@ void SaveMips(const ImageMips& texture, const char* fileName)
     stbi_write_png(fileName, width, height, 3, outputImage.data(), 0);
 }
 
-void TestMipMatrix(const ImageMips& texture, const Matrix22& transform)
+void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int width, int height)
 {
-    int outTextureWidth = texture[0].width * 2;
-    int outTextureHeight = texture[0].height * 2;
+    // TODO: multiplication order?
+
+    // account for the image scale in this transform
+    float imageScaleX = float(texture[0].width) / float(width);
+    float imageScaleY = float(texture[0].height) / float(height);
+    Matrix22 imageScale =
+    {
+        {
+            {imageScaleX, 0.0f},
+            {0.0f, imageScaleY}
+        }
+    };
+    Matrix22 derivativesTransform = imageScale * uvtransform;
 
     std::vector<RGBU8> nearestMip0;
     std::vector<RGBU8> nearestMip;
     std::vector<RGBU8> bilinear;
     std::vector<RGBU8> trilinear;
 
-    nearestMip0.resize(outTextureWidth*outTextureHeight);
-    nearestMip.resize(outTextureWidth*outTextureHeight);
-    bilinear.resize(outTextureWidth*outTextureHeight);
-    trilinear.resize(outTextureWidth*outTextureHeight);
+    nearestMip0.resize(width*height);
+    nearestMip.resize(width*height);
+    bilinear.resize(width*height);
+    trilinear.resize(width*height);
 
     Vector2 percent;
 
-    // TODO: image size differences are part of mip selection (delta) calculation too!
-
     // calculate what mip level we are going to be using.
     // It's constant across the whole image because transform is linear.
-    Vector2 d_uv_dx = Vector2{ 1.0f, 0.0f } * transform;
-    Vector2 d_uv_dy = Vector2{ 0.0f, 1.0f } * transform;
+    Vector2 d_uv_dx = Vector2{ 1.0f, 0.0f } * derivativesTransform;
+    Vector2 d_uv_dy = Vector2{ 0.0f, 1.0f } * derivativesTransform;
     float lenx = std::sqrtf(Dot(d_uv_dx, d_uv_dx));
     float leny = std::sqrtf(Dot(d_uv_dy, d_uv_dy));
     float maxlen = std::max(lenx, leny);
     float mip = clamp(std::log2f(maxlen), 0.0f, float(texture.size()-1));
 
     int outputIndex = 0;
-    for (int y = 0; y < outTextureHeight; ++y)
+    for (int y = 0; y < height; ++y)
     {
-        percent[1] = float(y) / float(outTextureHeight);
+        percent[1] = PixelToUV(y, height);
 
-        for (int x = 0; x < outTextureWidth; ++x)
+        for (int x = 0; x < width; ++x)
         {
-            percent[0] = float(x) / float(outTextureWidth);
+            percent[0] = PixelToUV(x, width);
 
-            Vector2 uv = percent * transform;
+            Vector2 uv = percent * uvtransform;
 
             // TODO: do a version that samples from mip0 always.
             // TODO: i guess the options would be: no mips nearest, mip nearest, mip bilinear, mip trilinear?
@@ -352,17 +375,17 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& transform)
             // TODO: wrap around is doing something weird on the vertical axis with y scale of 1. look into it!
 
             nearestMip0[outputIndex] = SampleNearest(texture[0], uv);
-            nearestMip[outputIndex] = SampleNearest(texture[int(mip+0.5f)], uv);
-            bilinear[outputIndex] = SampleBilinear(texture[0], uv);
+            nearestMip[outputIndex] = SampleNearest(texture[int(mip)], uv);
+            bilinear[outputIndex] = SampleBilinear(texture[int(mip)], uv);
 
             ++outputIndex;
         }
     }
 
     // TODO: combine the 3 images. vertically? and save the result
-    stbi_write_png("out/nearest0.png", outTextureWidth, outTextureHeight, 3, nearestMip0.data(), 0);
-    stbi_write_png("out/nearest.png", outTextureWidth, outTextureHeight, 3, nearestMip.data(), 0);
-    stbi_write_png("out/bilinear.png", outTextureWidth, outTextureHeight, 3, bilinear.data(), 0);
+    stbi_write_png("out/nearest0.png", width, height, 3, nearestMip0.data(), 0);
+    stbi_write_png("out/nearest.png", width, height, 3, nearestMip.data(), 0);
+    stbi_write_png("out/bilinear.png", width, height, 3, bilinear.data(), 0);
 }
 
 int main(int argc, char **argv)
@@ -371,7 +394,7 @@ int main(int argc, char **argv)
     ImageMips texture;
     {
         int width, height, numChannels;
-        uint8* image = stbi_load("colors.png", &width, &height, &numChannels, 3); // TODO: scenery.png!
+        uint8* image = stbi_load("scenery.png", &width, &height, &numChannels, 3);
         MakeMips(texture, image, width, height);
         stbi_image_free(image);
     }
@@ -382,13 +405,13 @@ int main(int argc, char **argv)
         Matrix22 mat =
         {
             {
-                {1.0f, 0.0f},
+                {2.25f, 0.0f},
                 {0.0f, 1.0f},
             }
         };
 
         // TODO: nearest is mirroring with colors.png (?!) and bilinear is all sorts of wrong. check it out.
-        TestMipMatrix(texture, mat);
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height);
     }
 
     return 0;
