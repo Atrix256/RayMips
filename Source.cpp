@@ -14,6 +14,8 @@ typedef uint32_t uint32;
 #include <algorithm>
 #include <array>
 
+static const float c_pi = 3.14159265359f;
+
 typedef std::array<float, 2> Vector2;
 
 typedef std::array<Vector2, 2> Matrix22;
@@ -30,6 +32,20 @@ static const Matrix22 c_identity22 =
         {0.0f, 1.0f}
     }
 };
+
+Matrix22 Rotation (float thetaRadians)
+{
+    float sinTheta = std::sinf(thetaRadians);
+    float cosTheta = std::cosf(thetaRadians);
+
+    return Matrix22
+    {
+        {
+            {cosTheta, sinTheta},
+            {-sinTheta, cosTheta}
+        }
+    };
+}
 
 Vector2 operator * (const Vector2& p, const Matrix22& m)
 {
@@ -70,7 +86,8 @@ inline int UVToPixel(float uv, int width)
     // x = x'*w-0.5
     // You would then round to the nearest int, which means you would add 0.5 and cast to int. So:
     // x = int(x'*w)
-    return int(uv*float(width));
+    // adding 1 to make slightly negative locations go positive. should probably handle negatives more robustly!
+    return int((uv + 1.0f)*float(width));
 }
 
 inline int UVToPixel(float uv, int width, float& fract)
@@ -323,7 +340,7 @@ void SaveMips(const ImageMips& texture, const char* fileName)
     stbi_write_png(fileName, width, height, 3, outputImage.data(), 0);
 }
 
-void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int width, int height)
+void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int width, int height, const char* baseFileName)
 {
     // TODO: multiplication order? Should matter with rotation.
 
@@ -382,10 +399,19 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
     }
 
     // TODO: combine the images and save the result? or leave them separate?
-    stbi_write_png("out/nearest0.png", width, height, 3, nearestMip0.data(), 0);
-    stbi_write_png("out/nearest.png", width, height, 3, nearestMip.data(), 0);
-    stbi_write_png("out/bilinear.png", width, height, 3, bilinear.data(), 0);
-    stbi_write_png("out/trilinear.png", width, height, 3, trilinear.data(), 0);
+    char fileName[256];
+
+    sprintf(fileName, "%s_a_none.png", baseFileName);
+    stbi_write_png(fileName, width, height, 3, nearestMip0.data(), 0);
+
+    sprintf(fileName, "%s_b_mip.png", baseFileName);
+    stbi_write_png(fileName, width, height, 3, nearestMip.data(), 0);
+
+    sprintf(fileName, "%s_c_bilinear.png", baseFileName);
+    stbi_write_png(fileName, width, height, 3, bilinear.data(), 0);
+
+    sprintf(fileName, "%s_d_trilinear.png", baseFileName);
+    stbi_write_png(fileName, width, height, 3, trilinear.data(), 0);
 }
 
 int main(int argc, char **argv)
@@ -410,7 +436,20 @@ int main(int argc, char **argv)
             }
         };
 
-        TestMipMatrix(texture, mat, texture[0].width, texture[0].height);
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/scale");
+    }
+
+    // test rotation
+    {
+        // TODO: maybe make a degrees to radians macro and use it here!
+        // TODO: test a 90 degree rotation, and a less clean rotation too
+        Matrix22 mat = Rotation(c_pi*0.5f);
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot90");
+
+        mat = Rotation(c_pi*0.1111f);
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot20");
+
+        // TODO: combine with a scaled image to make sure multiplication order etc is correct!
     }
 
     return 0;
@@ -420,6 +459,7 @@ int main(int argc, char **argv)
 
 * organize the code into a couple files?
 * todos
+* maybe do 3x3 matrices where the 3rd row is for translation
 
 ? do we go until the longer axis is 1, or the shorter axis?
 ? do you change mips when it takes 2 pixels, or 1.5 pixels? or > 1 pixels?
@@ -436,6 +476,7 @@ Streth goals:
    * https://www.opengl.org/discussion_boards/showthread.php/177520-Mipmap-level-calculation-using-dFdx-dFdy
    * https://amp.reddit.com/r/opengl/comments/3cdg5r/derivation_of_opengls_mipmap_level_computation/
    * rounding mip chosen looked too blurry to me so i went with floor(mip) for nearest and bilinear
+  * translation
   * uniform scaling
   * non uniform scaling (and show how max of pixel dimension choosing mip affects things!)
    * talk about rip maps and anisotropic sampling
