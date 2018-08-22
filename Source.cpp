@@ -188,6 +188,13 @@ RGBU8 SampleBilinear(const Image& image, const Vector2& uv)
     return lerp(px0, px1, yweight);
 }
 
+RGBU8 SampleTrilinear(const ImageMips& texture, const Vector2& uv, float mip)
+{
+    RGBU8 bilinearLowMip = SampleBilinear(texture[std::min(int(mip), (int)texture.size() - 1)], uv);
+    RGBU8 bilinearHighMip = SampleBilinear(texture[std::min(int(mip) + 1, (int)texture.size() - 1)], uv);
+    return lerp(bilinearLowMip, bilinearHighMip, std::fmodf(mip, 1.0f));
+}
+
 // using a gamma of 2.2
 inline float sRGBU8_To_LinearFloat(uint8 in)
 {
@@ -318,7 +325,7 @@ void SaveMips(const ImageMips& texture, const char* fileName)
 
 void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int width, int height)
 {
-    // TODO: multiplication order?
+    // TODO: multiplication order? Should matter with rotation.
 
     // account for the image scale in this transform
     float imageScaleX = float(texture[0].width) / float(width);
@@ -352,6 +359,7 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
     float leny = std::sqrtf(Dot(d_uv_dy, d_uv_dy));
     float maxlen = std::max(lenx, leny);
     float mip = clamp(std::log2f(maxlen), 0.0f, float(texture.size()-1));
+    int mipInt = clamp(int(mip), 0, int(texture.size() - 1));  // you could also add 0.5 before casting to int to round it. I felt that looked too blurry
 
     int outputIndex = 0;
     for (int y = 0; y < height; ++y)
@@ -364,15 +372,10 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
 
             Vector2 uv = percent * uvtransform;
 
-            // TODO: after calculating mip, do you round it or floor it?
-
             nearestMip0[outputIndex] = SampleNearest(texture[0], uv);
-            nearestMip[outputIndex] = SampleNearest(texture[int(mip)], uv);
-            bilinear[outputIndex] = SampleBilinear(texture[int(mip)], uv);
-
-            // TODO: only do the second bilinear if mip+1 is in range, else copy bilinear. Or do we need a SampleTrilinear function?
-            RGBU8 bilinearNextMip = SampleBilinear(texture[std::min(int(mip+1), (int)texture.size()-1)], uv);
-            trilinear[outputIndex] = lerp(bilinear[outputIndex], bilinearNextMip, std::fmodf(mip, 1.0f));
+            nearestMip[outputIndex] = SampleNearest(texture[mipInt], uv);
+            bilinear[outputIndex] = SampleBilinear(texture[mipInt], uv);
+            trilinear[outputIndex] = SampleTrilinear(texture, uv, mip);
 
             ++outputIndex;
         }
@@ -416,6 +419,7 @@ int main(int argc, char **argv)
 /*
 
 * organize the code into a couple files?
+* todos
 
 ? do we go until the longer axis is 1, or the shorter axis?
 ? do you change mips when it takes 2 pixels, or 1.5 pixels? or > 1 pixels?
@@ -423,5 +427,19 @@ int main(int argc, char **argv)
 
 Streth goals:
 ? do rip maps for aniso?
+
+* Blog:
+ ? should triangle filtering be mentioned to go along with box filtering? or nah?
+ * show show nearest0, nearest, bilinear, trilinear look. maybe slowly animate gif of a still?
+  * maybe show some 4 way split screen animated gif of texture scrolling, zooming, rotating?
+  * mip level selection links
+   * https://www.opengl.org/discussion_boards/showthread.php/177520-Mipmap-level-calculation-using-dFdx-dFdy
+   * https://amp.reddit.com/r/opengl/comments/3cdg5r/derivation_of_opengls_mipmap_level_computation/
+   * rounding mip chosen looked too blurry to me so i went with floor(mip) for nearest and bilinear
+  * uniform scaling
+  * non uniform scaling (and show how max of pixel dimension choosing mip affects things!)
+   * talk about rip maps and anisotropic sampling
+   * https://en.wikipedia.org/wiki/Anisotropic_filtering
+  * rotation
 
 */
