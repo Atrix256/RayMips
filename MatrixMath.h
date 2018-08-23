@@ -56,9 +56,9 @@ Matrix33 Rotation33 (float thetaRadians)
 }
 
 template <size_t N>
-Vector2 operator * (const std::array<float, N>& p, const std::array<std::array<float, N>, N>& m)
+std::array<float, N> operator * (const std::array<float, N>& p, const std::array<std::array<float, N>, N>& m)
 {
-    Vector2 ret;
+    std::array<float, N> ret;
     for (int i = 0; i < N; ++i)
     {
         ret[i] = 0.0f;
@@ -69,9 +69,9 @@ Vector2 operator * (const std::array<float, N>& p, const std::array<std::array<f
 }
 
 template <size_t N>
-Matrix22 operator * (const std::array<std::array<float, N>, N>& a, const std::array<std::array<float, N>, N>& b)
+std::array<std::array<float, N>, N> operator * (const std::array<std::array<float, N>, N>& a, const std::array<std::array<float, N>, N>& b)
 {
-    Matrix22 ret;
+    std::array<std::array<float, N>, N> ret;
     for (int i = 0; i < N; ++i)
     {
         for (int j = 0; j < N; ++j)

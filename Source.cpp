@@ -107,21 +107,22 @@ void SaveMips(const ImageMips& texture, const char* fileName)
     stbi_write_png(fileName, width, height, 3, outputImage.data(), 0);
 }
 
-void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int width, int height, const char* baseFileName)
+void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int width, int height, const char* baseFileName)
 {
     // TODO: multiplication order? Should matter with rotation.
 
     // account for the image scale in this transform
     float imageScaleX = float(texture[0].width) / float(width);
     float imageScaleY = float(texture[0].height) / float(height);
-    Matrix22 imageScale =
+    Matrix33 imageScale =
     {
         {
-            {imageScaleX, 0.0f},
-            {0.0f, imageScaleY}
+            {imageScaleX, 0.0f, 0.0f},
+            {0.0f, imageScaleY, 0.0f},
+            {0.0f, 0.0f, 1.0f},
         }
     };
-    Matrix22 derivativesTransform = imageScale * uvtransform;
+    Matrix33 derivativesTransform = imageScale * uvtransform;
 
     std::vector<RGBU8> nearestMip0;
     std::vector<RGBU8> nearestMip;
@@ -133,12 +134,14 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
     bilinear.resize(width*height);
     trilinear.resize(width*height);
 
-    Vector2 percent;
+    Vector3 percent;
 
     // calculate what mip level we are going to be using.
     // It's constant across the whole image because transform is linear.
-    Vector2 d_uv_dx = Vector2{ 1.0f, 0.0f } * derivativesTransform;
-    Vector2 d_uv_dy = Vector2{ 0.0f, 1.0f } * derivativesTransform;
+    Vector3 d_uv_dx_3 = Vector3{ 1.0f, 0.0f, 0.0f } * derivativesTransform;
+    Vector3 d_uv_dy_3 = Vector3{ 0.0f, 1.0f, 0.0f } * derivativesTransform;
+    Vector2 d_uv_dx = { d_uv_dx_3[0], d_uv_dx_3[1] };
+    Vector2 d_uv_dy = { d_uv_dy_3[0], d_uv_dy_3[1] };
     float lenx = std::sqrtf(Dot(d_uv_dx, d_uv_dx));
     float leny = std::sqrtf(Dot(d_uv_dy, d_uv_dy));
     float maxlen = std::max(lenx, leny);
@@ -146,6 +149,7 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
     int mipInt = clamp(int(mip), 0, int(texture.size() - 1));  // you could also add 0.5 before casting to int to round it. I felt that looked too blurry
 
     int outputIndex = 0;
+    percent[2] = 1.0f;
     for (int y = 0; y < height; ++y)
     {
         percent[1] = PixelToUV(y, height);
@@ -154,7 +158,8 @@ void TestMipMatrix(const ImageMips& texture, const Matrix22& uvtransform, int wi
         {
             percent[0] = PixelToUV(x, width);
 
-            Vector2 uv = percent * uvtransform;
+            Vector3 uv3 = percent * uvtransform;
+            Vector2 uv = { uv3[0], uv3[1] };
 
             nearestMip0[outputIndex] = SampleNearest(texture[0], uv);
             nearestMip[outputIndex] = SampleNearest(texture[mipInt], uv);
@@ -194,11 +199,12 @@ int main(int argc, char **argv)
 
     // test mip scaling
     {
-        Matrix22 mat =
+        Matrix33 mat =
         {
             {
-                {3.0f, 0.0f},
-                {0.0f, 1.0f},
+                {3.0f, 0.0f, 0.0f},
+                {0.0f, 1.0f, 0.0f},
+                {0.0f, 0.0f, 1.0f},
             }
         };
 
@@ -207,24 +213,39 @@ int main(int argc, char **argv)
 
     // test rotation
     {
-        Matrix22 mat = Rotation22(DegreesToRadians(90.0f));
+        Matrix33 mat = Rotation33(DegreesToRadians(90.0f));
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot90");
 
-        mat = Rotation22(DegreesToRadians(20.0f));
+        mat = Rotation33(DegreesToRadians(20.0f));
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot20");
 
-        mat = Rotation22(DegreesToRadians(90.0f));
+        mat = Rotation33(DegreesToRadians(20.0f));
         TestMipMatrix(texture, mat, texture[0].width*2, texture[0].height*2, "out/rot20large");
 
         // TODO: figure out how to make sure the multiplication order is correct inside TestMipMatrix
     }
 
+    // test mip scaling
+    {
+        Matrix33 mat =
+        {
+            {
+                {1.0f, 0.0f, 0.0f},
+                {0.0f, 1.0f, 0.0f},
+                {0.2f, 0.2f, 1.0f},
+            }
+        };
+
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/translation");
+        // TODO: is it translating the correct direction?
+    }
+
+    // TODO: make a scale22 and scale33 function and use it instead of making them by hand
+
     return 0;
 }
 
 /*
-
-* organize the code into a couple files?
 * todos
 * maybe do 3x3 matrices where the 3rd row is for translation
 
