@@ -3,4 +3,8 @@
   <ItemGroup>
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="MatrixMath.h" />
+    <ClInclude Include="Images.h" />
+  </ItemGroup>
 </Project>

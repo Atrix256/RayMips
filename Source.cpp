@@ -1,79 +1,18 @@
 #define _CRT_SECURE_NO_WARNINGS
 
+#include "MatrixMath.h"
+#include "Images.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#include <stdint.h>
-typedef uint8_t uint8;
-typedef uint32_t uint32;
-
 #include <vector>
 #include <algorithm>
-#include <array>
 
 static const float c_pi = 3.14159265359f;
-
-typedef std::array<float, 2> Vector2;
-
-typedef std::array<Vector2, 2> Matrix22;
-// indexed as [row][column]
-// [0][0] = row0 col0
-// [0][1] = row0 col1
-// [1][0] = row1 col0
-// [1][1] = row1 col1
-
-static const Matrix22 c_identity22 = 
-{
-    {
-        {1.0f, 0.0f},
-        {0.0f, 1.0f}
-    }
-};
-
-Matrix22 Rotation (float thetaRadians)
-{
-    float sinTheta = std::sinf(thetaRadians);
-    float cosTheta = std::cosf(thetaRadians);
-
-    return Matrix22
-    {
-        {
-            {cosTheta, sinTheta},
-            {-sinTheta, cosTheta}
-        }
-    };
-}
-
-Vector2 operator * (const Vector2& p, const Matrix22& m)
-{
-    Vector2 ret;
-    ret[0] = p[0] * m[0][0] + p[1] * m[1][0];
-    ret[1] = p[0] * m[0][1] + p[1] * m[1][1];
-    return ret;
-}
-
-Matrix22 operator * (const Matrix22& a, const Matrix22& b)
-{
-    Matrix22 ret;
-    for (int i = 0; i < 2; ++i)
-    {
-        for (int j = 0; j < 2; ++j)
-        {
-            ret[i][j] = a[i][j] * b[j][i];
-        }
-    }
-    return ret;
-}
-
-float Dot(const Vector2& a, const Vector2& b)
-{
-    return
-        a[0] * b[0] +
-        a[1] * b[1];
-}
 
 inline float PixelToUV(int pixel, int width)
 {
@@ -443,13 +382,17 @@ int main(int argc, char **argv)
     {
         // TODO: maybe make a degrees to radians macro and use it here!
         // TODO: test a 90 degree rotation, and a less clean rotation too
-        Matrix22 mat = Rotation(c_pi*0.5f);
+        Matrix22 mat = Rotation22(c_pi*0.5f);
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot90");
 
-        mat = Rotation(c_pi*0.1111f);
+        mat = Rotation22(c_pi*0.1111f);
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot20");
 
+        mat = Rotation22(c_pi*0.1111f);
+        TestMipMatrix(texture, mat, texture[0].width*2, texture[0].height*2, "out/rot20large");
+
         // TODO: combine with a scaled image to make sure multiplication order etc is correct!
+        // TODO: figure out how to make sure the multiplication order is correct.
     }
 
     return 0;
