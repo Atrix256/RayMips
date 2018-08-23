@@ -6,5 +6,6 @@
   <ItemGroup>
     <ClInclude Include="MatrixMath.h" />
     <ClInclude Include="Images.h" />
+    <ClInclude Include="Math.h" />
   </ItemGroup>
 </Project>
