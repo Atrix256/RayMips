@@ -134,7 +134,7 @@ void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int wi
     bilinear.resize(width*height);
     trilinear.resize(width*height);
 
-    Vector3 percent;
+
 
     // calculate what mip level we are going to be using.
     // It's constant across the whole image because transform is linear.
@@ -148,8 +148,8 @@ void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int wi
     float mip = clamp(std::log2f(maxlen), 0.0f, float(texture.size()-1));
     int mipInt = clamp(int(mip), 0, int(texture.size() - 1));  // you could also add 0.5 before casting to int to round it. I felt that looked too blurry
 
+    Vector3 percent = { 0.0f, 0.0f, 1.0f };
     int outputIndex = 0;
-    percent[2] = 1.0f;
     for (int y = 0; y < height; ++y)
     {
         percent[1] = PixelToUV(y, height);
@@ -237,7 +237,6 @@ int main(int argc, char **argv)
         };
 
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/translation");
-        // TODO: is it translating the correct direction?
     }
 
     // TODO: make a scale22 and scale33 function and use it instead of making them by hand
