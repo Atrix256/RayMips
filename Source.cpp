@@ -10,6 +10,38 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+void SaveCombinedImages2x2(const char* fileName, int width, int height, const RGBU8* p00, const RGBU8* p10, const RGBU8* p01, const RGBU8* p11)
+{
+    std::vector<RGBU8> output;
+    output.resize((width * 2 + 1) * (height * 2 + 1));
+
+    for (int y = 0; y < height; ++y)
+    {
+        RGBU8* dest00 = &output[y * (width * 2 + 1)];
+        RGBU8* dest10 = &output[y * (width * 2 + 1) + width + 1];
+        RGBU8* dest01 = &output[(y + height + 1) * (width * 2 + 1)];
+        RGBU8* dest11 = &output[(y + height + 1) * (width * 2 + 1) + width + 1];
+
+        int sourceIndex = y * width;
+
+        for (int x = 0; x < width; ++x)
+        {
+            dest00[0] = p00[sourceIndex];
+            dest10[0] = p10[sourceIndex];
+            dest01[0] = p01[sourceIndex];
+            dest11[0] = p11[sourceIndex];
+
+            ++dest00;
+            ++dest10;
+            ++dest01;
+            ++dest11;
+            ++sourceIndex;
+        }
+    }
+
+    stbi_write_png(fileName, width * 2 + 1, height * 2 + 1, 3, output.data(), 0);
+}
+
 // Make mips of an image, using a box filter. This is a common way to make mips.
 void MakeMips(ImageMips& mips, const uint8* pixels, int width, int height)
 {
@@ -107,7 +139,7 @@ void SaveMips(const ImageMips& texture, const char* fileName)
     stbi_write_png(fileName, width, height, 3, outputImage.data(), 0);
 }
 
-void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int width, int height, const char* baseFileName)
+void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int width, int height, const char* fileName)
 {
     // TODO: multiplication order? Should matter with rotation.
 
@@ -164,19 +196,7 @@ void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int wi
         }
     }
 
-    char fileName[256];
-
-    sprintf(fileName, "%s_a_none.png", baseFileName);
-    stbi_write_png(fileName, width, height, 3, nearestMip0.data(), 0);
-
-    sprintf(fileName, "%s_b_mip.png", baseFileName);
-    stbi_write_png(fileName, width, height, 3, nearestMip.data(), 0);
-
-    sprintf(fileName, "%s_c_bilinear.png", baseFileName);
-    stbi_write_png(fileName, width, height, 3, bilinear.data(), 0);
-
-    sprintf(fileName, "%s_d_trilinear.png", baseFileName);
-    stbi_write_png(fileName, width, height, 3, trilinear.data(), 0);
+    SaveCombinedImages2x2(fileName, width, height, nearestMip0.data(), nearestMip.data(), bilinear.data(), trilinear.data());
 }
 
 int main(int argc, char **argv)
@@ -195,19 +215,19 @@ int main(int argc, char **argv)
     {
         Matrix33 mat = Scale33({ 3.0f, 1.0f, 1.0f });
 
-        TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/scale");
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/scale.png");
     }
 
     // test rotation
     {
         Matrix33 mat = Rotation33(DegreesToRadians(90.0f));
-        TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot90");
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot90.png");
 
         mat = Rotation33(DegreesToRadians(20.0f));
-        TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot20");
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height, "out/rot20.png");
 
         mat = Rotation33(DegreesToRadians(20.0f));
-        TestMipMatrix(texture, mat, texture[0].width*2, texture[0].height*2, "out/rot20large");
+        TestMipMatrix(texture, mat, texture[0].width*2, texture[0].height*2, "out/rot20large.png");
 
         // TODO: figure out how to make sure the multiplication order is correct inside TestMipMatrix
     }
@@ -215,8 +235,10 @@ int main(int argc, char **argv)
     // test mip translation
     {
         Matrix33 mat = Translate33({0.2f, 0.2f});
-        TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/translation");
+        TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/translation.png");
     }
+
+    // TODO: srgb correction on load and save?
 
     return 0;
 }
