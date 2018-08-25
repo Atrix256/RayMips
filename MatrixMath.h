@@ -55,6 +55,30 @@ Matrix33 Rotation33 (float thetaRadians)
     };
 }
 
+Matrix33 Scale33(const Vector3& scale)
+{
+    return Matrix33
+    {
+        {
+            {scale[0], 0.0f, 0.0f},
+            {0.0f, scale[1], 0.0f},
+            {0.0f, 0.0f, scale[2]},
+        }
+    };
+}
+
+Matrix33 Translate33(const Vector2& translation)
+{
+    return Matrix33
+    {
+        {
+            {1.0f, 0.0f, 0.0f},
+            {0.0f, 1.0f, 0.0f},
+            {translation[0], translation[1], 1.0f},
+        }
+    };
+}
+
 template <size_t N>
 std::array<float, N> operator * (const std::array<float, N>& p, const std::array<std::array<float, N>, N>& m)
 {

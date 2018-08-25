@@ -114,14 +114,8 @@ void TestMipMatrix(const ImageMips& texture, const Matrix33& uvtransform, int wi
     // account for the image scale in this transform
     float imageScaleX = float(texture[0].width) / float(width);
     float imageScaleY = float(texture[0].height) / float(height);
-    Matrix33 imageScale =
-    {
-        {
-            {imageScaleX, 0.0f, 0.0f},
-            {0.0f, imageScaleY, 0.0f},
-            {0.0f, 0.0f, 1.0f},
-        }
-    };
+    Matrix33 imageScale = Scale33({ imageScaleX, imageScaleY, 1.0f });
+
     Matrix33 derivativesTransform = imageScale * uvtransform;
 
     std::vector<RGBU8> nearestMip0;
@@ -199,14 +193,7 @@ int main(int argc, char **argv)
 
     // test mip scaling
     {
-        Matrix33 mat =
-        {
-            {
-                {3.0f, 0.0f, 0.0f},
-                {0.0f, 1.0f, 0.0f},
-                {0.0f, 0.0f, 1.0f},
-            }
-        };
+        Matrix33 mat = Scale33({ 3.0f, 1.0f, 1.0f });
 
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/scale");
     }
@@ -225,21 +212,11 @@ int main(int argc, char **argv)
         // TODO: figure out how to make sure the multiplication order is correct inside TestMipMatrix
     }
 
-    // test mip scaling
+    // test mip translation
     {
-        Matrix33 mat =
-        {
-            {
-                {1.0f, 0.0f, 0.0f},
-                {0.0f, 1.0f, 0.0f},
-                {0.2f, 0.2f, 1.0f},
-            }
-        };
-
+        Matrix33 mat = Translate33({0.2f, 0.2f});
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/translation");
     }
-
-    // TODO: make a scale22 and scale33 function and use it instead of making them by hand
 
     return 0;
 }
