@@ -211,6 +211,13 @@ int main(int argc, char **argv)
     }
     SaveMips(texture, "out/mips.png");
 
+    // test subpixel translation
+    {
+        TestMipMatrix(texture, c_identity33, texture[0].width, texture[0].height, "out/translation0.png");
+        float translateX = 0.5f / float(texture[0].width);
+        TestMipMatrix(texture, Translate33({ translateX, 0.0f }), texture[0].width, texture[0].height, "out/translation1.png");
+    }
+
     // test mip scaling
     {
         Matrix33 mat = Scale33({ 3.0f, 1.0f, 1.0f });
