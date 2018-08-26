@@ -212,9 +212,11 @@ int main(int argc, char **argv)
     SaveMips(texture, "out/mips.png");
 
     // test subpixel translation: shows the usefulness of pixel interpolation (make a gif)
+    // TODO: a value of 0.5 makes most pixel shifts but not all. so i tried 0.75 and it didn't really show anything compelling
+    // TODO: maybe just have a slow translation of like tens of pixels over a second or two - on a sine wave?
     {
         TestMipMatrix(texture, c_identity33, texture[0].width, texture[0].height, "out/translation0.png");
-        float translateX = 0.5f / float(texture[0].width);
+        float translateX = 0.75f / float(texture[0].width);
         TestMipMatrix(texture, Translate33({ translateX, 0.0f }), texture[0].width, texture[0].height, "out/translation1.png");
     }
 
