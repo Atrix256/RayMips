@@ -211,12 +211,15 @@ int main(int argc, char **argv)
     }
     SaveMips(texture, "out/mips.png");
 
-    // test subpixel translation
+    // test subpixel translation: shows the usefulness of pixel interpolation (make a gif)
     {
         TestMipMatrix(texture, c_identity33, texture[0].width, texture[0].height, "out/translation0.png");
         float translateX = 0.5f / float(texture[0].width);
         TestMipMatrix(texture, Translate33({ translateX, 0.0f }), texture[0].width, texture[0].height, "out/translation1.png");
     }
+
+
+    // TODO: make the other tests meaningful
 
     // test mip scaling
     {
@@ -245,18 +248,16 @@ int main(int argc, char **argv)
         TestMipMatrix(texture, mat, texture[0].width, texture[0].height,"out/translation.png");
     }
 
-    // TODO: srgb correction on load and save?
+    // TODO: srgb correction on load and save? maybe work in floats until save time too.
 
     return 0;
 }
 
 /*
 * todos
-* maybe do 3x3 matrices where the 3rd row is for translation
 
-? do we go until the longer axis is 1, or the shorter axis?
-? do you change mips when it takes 2 pixels, or 1.5 pixels? or > 1 pixels?
-? log2(x) is non linear between multiples of 2. Is that correct? I bet so but...
+* show basic operations with mips. 
+* start raytracing w/ mips
 
 Streth goals:
 ? do rip maps for aniso?
